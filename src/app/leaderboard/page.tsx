@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Camera, Heart, Trophy } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '@/lib/supabase';
@@ -15,7 +15,6 @@ export default function LeaderboardPage() {
   const [lens, setLens] = useState<RankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [celebration, setCelebration] = useState<string | null>(null);
-  const firstLoadRef = useRef(true);
 
   const load = useCallback(async () => {
     const [a, b] = await Promise.all([
@@ -64,7 +63,7 @@ export default function LeaderboardPage() {
     const justTookPhotos = isPhotosLeader && !prev.photos;
     const justTookLikes = isLikesLeader && !prev.likes;
 
-    if (!firstLoadRef.current && (justTookPhotos || justTookLikes)) {
+    if (justTookPhotos || justTookLikes) {
       let msg: string;
       if (justTookPhotos && justTookLikes) {
         msg = "You're leading both rankings!";
@@ -81,7 +80,6 @@ export default function LeaderboardPage() {
       LEADER_KEY,
       JSON.stringify({ photos: isPhotosLeader, likes: isLikesLeader }),
     );
-    firstLoadRef.current = false;
   }, [paps, lens, loading, identity.id]);
 
   return (
