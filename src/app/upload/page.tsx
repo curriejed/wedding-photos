@@ -29,7 +29,7 @@ export default function UploadPage() {
         setProgress(`Uploading ${i} of ${files.length}…`);
 
         const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-        const path = `${identity.id}/${Date.now()}-${cryptoRandom()}.${ext}`;
+        const path = `${slugify(identity.name)}/${Date.now()}-${cryptoRandom()}.${ext}`;
 
         const up = await supabase.storage.from(BUCKET).upload(path, file, {
           contentType: file.type || 'image/jpeg',
@@ -100,4 +100,15 @@ function cryptoRandom() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
     return crypto.randomUUID();
   return Math.random().toString(36).slice(2);
+}
+
+function slugify(s: string) {
+  const base = s
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return base || 'guest';
 }
