@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useIdentity } from '@/components/IdentityProvider';
 import { PhotoCard } from '@/components/PhotoCard';
 import { isAdmin } from '@/lib/identity';
 import type { PhotoWithStats } from '@/lib/types';
+
+type SortMode = 'new' | 'liked';
 
 export default function HomePage() {
   const { identity } = useIdentity();
@@ -13,6 +15,7 @@ export default function HomePage() {
   const [myLikes, setMyLikes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [admin, setAdminState] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('new');
 
   useEffect(() => setAdminState(isAdmin()), []);
 
@@ -49,24 +52,57 @@ export default function HomePage() {
     };
   }, [load]);
 
+  const sorted = useMemo(() => {
+    const arr = [...photos];
+    if (sortMode === 'liked') {
+      arr.sort((a, b) => {
+        if (b.like_count !== a.like_count) return b.like_count - a.like_count;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    } else {
+      arr.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+    }
+    return arr;
+  }, [photos, sortMode]);
+
   return (
     <main className="mx-auto max-w-2xl px-3 pb-28 pt-6">
-      <header className="mb-5 px-2">
+      <header className="mb-4 px-2">
         <h1 className="font-display text-3xl text-olive-900">Wedding Gallery</h1>
         <p className="text-sm text-olive-500">
           Hi {identity.name} — tap the heart to like.
         </p>
       </header>
 
+      <div
+        className="mb-4 inline-flex w-full max-w-xs rounded-full bg-olive-100 p-1 text-sm font-semibold"
+        role="tablist"
+        aria-label="Sort gallery"
+      >
+        <SortTab
+          active={sortMode === 'new'}
+          onClick={() => setSortMode('new')}
+          label="New"
+        />
+        <SortTab
+          active={sortMode === 'liked'}
+          onClick={() => setSortMode('liked')}
+          label="Most Liked"
+        />
+      </div>
+
       {loading ? (
         <p className="py-12 text-center text-olive-400">Loading…</p>
-      ) : photos.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <p className="py-12 text-center text-olive-400">
           No photos yet — be the first to share one.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {photos.map((p) => (
+          {sorted.map((p) => (
             <PhotoCard
               key={p.id}
               photo={p}
@@ -79,5 +115,31 @@ export default function HomePage() {
         </div>
       )}
     </main>
+  );
+}
+
+function SortTab({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`flex-1 rounded-full px-4 py-2 transition ${
+        active
+          ? 'bg-white text-olive-800 shadow-sm'
+          : 'text-olive-600 active:bg-olive-200'
+      }`}
+    >
+      {label}
+    </button>
   );
 }

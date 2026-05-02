@@ -26,13 +26,15 @@ export default function UploadPage() {
       let i = 0;
       for (const file of files) {
         i++;
-        setProgress(`Uploading ${i} of ${files.length}…`);
 
-        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+        setProgress(`Preparing ${i} of ${files.length}…`);
+        const { blob, contentType, ext } = await prepareForUpload(file);
+
+        setProgress(`Uploading ${i} of ${files.length}…`);
         const path = `${slugify(identity.name)}/${Date.now()}-${cryptoRandom()}.${ext}`;
 
-        const up = await supabase.storage.from(BUCKET).upload(path, file, {
-          contentType: file.type || 'image/jpeg',
+        const up = await supabase.storage.from(BUCKET).upload(path, blob, {
+          contentType,
           cacheControl: '3600',
         });
         if (up.error) throw up.error;
@@ -100,6 +102,61 @@ function cryptoRandom() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
     return crypto.randomUUID();
   return Math.random().toString(36).slice(2);
+}
+
+const MAX_EDGE = 1920;
+const JPEG_QUALITY = 0.85;
+
+async function prepareForUpload(
+  file: File,
+): Promise<{ blob: Blob; contentType: string; ext: string }> {
+  const fallback = {
+    blob: file,
+    contentType: file.type || 'image/jpeg',
+    ext: (file.name.split('.').pop() || 'jpg').toLowerCase(),
+  };
+
+  if (!file.type.startsWith('image/')) return fallback;
+
+  try {
+    const compressed = await compressImage(file);
+    if (compressed && compressed.size < file.size) {
+      return { blob: compressed, contentType: 'image/jpeg', ext: 'jpg' };
+    }
+  } catch {
+    // fall through to original
+  }
+  return fallback;
+}
+
+async function compressImage(file: File): Promise<Blob | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('image decode failed'));
+      i.src = url;
+    });
+
+    const longestEdge = Math.max(img.width, img.height);
+    const scale = longestEdge > MAX_EDGE ? MAX_EDGE / longestEdge : 1;
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, w, h);
+
+    return await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', JPEG_QUALITY),
+    );
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function slugify(s: string) {
