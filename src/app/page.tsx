@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useIdentity } from '@/components/IdentityProvider';
 import { PhotoCard } from '@/components/PhotoCard';
 import { PhotoViewer } from '@/components/PhotoViewer';
+import { PhotographerFilter } from '@/components/PhotographerFilter';
 import { isAdmin } from '@/lib/identity';
 import type { PhotoWithStats } from '@/lib/types';
 
@@ -17,6 +18,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [admin, setAdminState] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('new');
+  const [filterPerson, setFilterPerson] = useState<string | null>(null);
   const [viewerPhoto, setViewerPhoto] = useState<PhotoWithStats | null>(null);
 
   useEffect(() => setAdminState(isAdmin()), []);
@@ -54,8 +56,18 @@ export default function HomePage() {
     };
   }, [load]);
 
-  const sorted = useMemo(() => {
-    const arr = [...photos];
+  const people = useMemo(() => {
+    const names = new Set(photos.map((p) => p.user_name));
+    return Array.from(names).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' }),
+    );
+  }, [photos]);
+
+  const visible = useMemo(() => {
+    let arr = filterPerson
+      ? photos.filter((p) => p.user_name === filterPerson)
+      : [...photos];
+
     if (sortMode === 'liked') {
       arr.sort((a, b) => {
         if (b.like_count !== a.like_count) return b.like_count - a.like_count;
@@ -68,7 +80,7 @@ export default function HomePage() {
       );
     }
     return arr;
-  }, [photos, sortMode]);
+  }, [photos, sortMode, filterPerson]);
 
   return (
     <main className="mx-auto max-w-2xl px-3 pb-28 pt-6">
@@ -78,6 +90,14 @@ export default function HomePage() {
           Hi {identity.name} — tap the heart to like.
         </p>
       </header>
+
+      <div className="mb-3 px-1">
+        <PhotographerFilter
+          people={people}
+          value={filterPerson}
+          onChange={setFilterPerson}
+        />
+      </div>
 
       <div
         className="mb-4 inline-flex w-full max-w-xs rounded-full bg-olive-100 p-1 text-sm font-semibold"
@@ -98,13 +118,15 @@ export default function HomePage() {
 
       {loading ? (
         <p className="py-12 text-center text-olive-400">Loading…</p>
-      ) : sorted.length === 0 ? (
+      ) : visible.length === 0 ? (
         <p className="py-12 text-center text-olive-400">
-          No photos yet — be the first to share one.
+          {filterPerson
+            ? `No photos by ${filterPerson} yet.`
+            : 'No photos yet — be the first to share one.'}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {sorted.map((p) => (
+          {visible.map((p) => (
             <PhotoCard
               key={p.id}
               photo={p}

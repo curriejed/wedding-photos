@@ -2,6 +2,7 @@
 
 import { Download, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import type { PhotoWithStats } from '@/lib/types';
 
 export function PhotoViewer({
@@ -107,23 +108,44 @@ export function PhotoViewer({
       </header>
 
       <div
-        className="flex flex-1 items-center justify-center overflow-hidden p-2"
+        className="relative flex flex-1 items-center justify-center overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo.public_url}
-          alt={`Photo by ${photo.user_name}`}
-          className="max-h-full max-w-full select-none object-contain"
-          draggable={false}
-        />
+        <TransformWrapper
+          minScale={1}
+          maxScale={6}
+          initialScale={1}
+          centerOnInit
+          wheel={{ step: 0.15 }}
+          doubleClick={{ step: 1.8, mode: 'toggle' }}
+          panning={{ velocityDisabled: true }}
+        >
+          <TransformComponent
+            wrapperStyle={{ width: '100%', height: '100%' }}
+            contentStyle={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photo.public_url}
+              alt={`Photo by ${photo.user_name}`}
+              className="max-h-full max-w-full select-none object-contain"
+              draggable={false}
+            />
+          </TransformComponent>
+        </TransformWrapper>
       </div>
 
       {msg && (
         <p className="px-6 pb-2 text-center text-sm text-white/80">{msg}</p>
       )}
       <p className="px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-white/50">
-        Tap outside to close · long-press the image to save on iOS
+        Pinch or double-tap to zoom · tap outside to close
       </p>
     </div>
   );
