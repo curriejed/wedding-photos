@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useIdentity } from '@/components/IdentityProvider';
 import { PhotoCard } from '@/components/PhotoCard';
+import { PhotoViewer } from '@/components/PhotoViewer';
 import { isAdmin } from '@/lib/identity';
 import type { PhotoWithStats } from '@/lib/types';
 
@@ -16,6 +17,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [admin, setAdminState] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('new');
+  const [viewerPhoto, setViewerPhoto] = useState<PhotoWithStats | null>(null);
 
   useEffect(() => setAdminState(isAdmin()), []);
 
@@ -110,9 +112,17 @@ export default function HomePage() {
               myId={identity.id}
               admin={admin}
               onChange={load}
+              onView={() => setViewerPhoto(p)}
             />
           ))}
         </div>
+      )}
+
+      {viewerPhoto && (
+        <PhotoViewer
+          photo={viewerPhoto}
+          onClose={() => setViewerPhoto(null)}
+        />
       )}
     </main>
   );

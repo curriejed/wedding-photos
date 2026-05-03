@@ -11,9 +11,10 @@ type Props = {
   myId: string;
   admin: boolean;
   onChange: () => void;
+  onView: () => void;
 };
 
-export function PhotoCard({ photo, liked, myId, admin, onChange }: Props) {
+export function PhotoCard({ photo, liked, myId, admin, onChange, onView }: Props) {
   const [busy, setBusy] = useState(false);
   const [optimisticLiked, setOptimisticLiked] = useState(liked);
   const [optimisticCount, setOptimisticCount] = useState(photo.like_count);
@@ -57,7 +58,12 @@ export function PhotoCard({ photo, liked, myId, admin, onChange }: Props) {
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white shadow-md">
-      <div className="relative aspect-square w-full bg-olive-100">
+      <button
+        type="button"
+        onClick={onView}
+        className="relative block aspect-square w-full overflow-hidden bg-olive-100 active:opacity-90"
+        aria-label={`View photo by ${photo.user_name}`}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={photo.public_url}
@@ -65,7 +71,7 @@ export function PhotoCard({ photo, liked, myId, admin, onChange }: Props) {
           className="h-full w-full object-cover"
           loading="lazy"
         />
-      </div>
+      </button>
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-olive-900">
