@@ -100,7 +100,7 @@ export function PhotographerFilter({ people, value, onChange }: Props) {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search a guest…"
+              placeholder="Search"
               className="w-full bg-transparent py-1 text-sm outline-none placeholder:text-olive-400"
             />
           </div>
