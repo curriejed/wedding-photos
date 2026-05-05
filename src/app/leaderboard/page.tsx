@@ -1,13 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Camera, Heart, Trophy } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Camera,
+  Heart,
+  Minus,
+  Trophy,
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '@/lib/supabase';
 import { useIdentity } from '@/components/IdentityProvider';
 import type { RankRow } from '@/lib/types';
 
 const LEADER_KEY = 'wedding_leader_state';
+const POS_KEY = 'wedding_position_state';
+
+type PosState = { photos: number | null; likes: number | null };
 
 export default function LeaderboardPage() {
   const { identity } = useIdentity();
@@ -15,15 +25,26 @@ export default function LeaderboardPage() {
   const [lens, setLens] = useState<RankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [celebration, setCelebration] = useState<string | null>(null);
+  const [prevPos, setPrevPos] = useState<PosState>({ photos: null, likes: null });
+  const lastSeenRef = useRef<PosState>({ photos: null, likes: null });
 
   const load = useCallback(async () => {
     const [a, b] = await Promise.all([
-      supabase.from('paparazzi_ranking').select('*').limit(50),
-      supabase.from('golden_lens_ranking').select('*').limit(50),
+      supabase.from('paparazzi_ranking').select('*'),
+      supabase.from('golden_lens_ranking').select('*'),
     ]);
     setPaps((a.data ?? []) as RankRow[]);
     setLens((b.data ?? []) as RankRow[]);
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(POS_KEY);
+      if (raw) setPrevPos(JSON.parse(raw));
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {
@@ -45,6 +66,30 @@ export default function LeaderboardPage() {
       supabase.removeChannel(channel);
     };
   }, [load]);
+
+  const myPhotosPos = useMemo(() => {
+    const idx = paps.findIndex((r) => r.id === identity.id);
+    return idx >= 0 ? idx + 1 : null;
+  }, [paps, identity.id]);
+
+  const myLikesPos = useMemo(() => {
+    const idx = lens.findIndex((r) => r.id === identity.id);
+    return idx >= 0 ? idx + 1 : null;
+  }, [lens, identity.id]);
+
+  useEffect(() => {
+    lastSeenRef.current = { photos: myPhotosPos, likes: myLikesPos };
+  }, [myPhotosPos, myLikesPos]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        localStorage.setItem(POS_KEY, JSON.stringify(lastSeenRef.current));
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -82,6 +127,9 @@ export default function LeaderboardPage() {
     );
   }, [paps, lens, loading, identity.id]);
 
+  const photosDelta = computeDelta(prevPos.photos, myPhotosPos);
+  const likesDelta = computeDelta(prevPos.likes, myLikesPos);
+
   return (
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-6">
       <header className="mb-5 flex items-center gap-3 px-2">
@@ -99,6 +147,7 @@ export default function LeaderboardPage() {
             rows={paps}
             valueKey="photo_count"
             meId={identity.id}
+            myDelta={photosDelta}
             accent="bg-olive-100 text-olive-700"
           />
           <Section
@@ -107,6 +156,7 @@ export default function LeaderboardPage() {
             rows={lens}
             valueKey="like_count"
             meId={identity.id}
+            myDelta={likesDelta}
             accent="bg-amber-100 text-amber-700"
           />
         </>
@@ -122,12 +172,18 @@ export default function LeaderboardPage() {
   );
 }
 
+function computeDelta(prev: number | null, current: number | null): number | null {
+  if (prev === null || current === null) return null;
+  return prev - current;
+}
+
 function Section({
   subtitle,
   icon,
   rows,
   valueKey,
   meId,
+  myDelta,
   accent,
 }: {
   subtitle: string;
@@ -135,10 +191,11 @@ function Section({
   rows: RankRow[];
   valueKey: 'photo_count' | 'like_count';
   meId: string;
+  myDelta: number | null;
   accent: string;
 }) {
   return (
-    <section className="mb-6 rounded-2xl bg-white p-4 shadow-md">
+    <section className="mb-6 overflow-hidden rounded-2xl bg-white p-4 shadow-md">
       <div className="mb-3 flex items-center gap-3">
         <span className={`rounded-full p-2 ${accent}`}>{icon}</span>
         <h2 className="font-display text-lg text-olive-900">{subtitle}</h2>
@@ -149,7 +206,7 @@ function Section({
           No data yet.
         </p>
       ) : (
-        <ol className="divide-y divide-olive-100">
+        <ol className="-mx-1 max-h-[26rem] divide-y divide-olive-100 overflow-y-auto px-1">
           {rows.map((r, i) => {
             const isMe = r.id === meId;
             return (
@@ -168,7 +225,7 @@ function Section({
                     {i + 1}
                   </span>
                   <span
-                    className={`truncate ${
+                    className={`min-w-0 flex-1 truncate ${
                       isMe
                         ? 'font-bold text-olive-900'
                         : 'font-medium text-olive-900'
@@ -176,9 +233,12 @@ function Section({
                   >
                     {r.name}
                     {isMe && (
-                      <span className="ml-2 text-xs font-semibold text-amber-700">
-                        you
-                      </span>
+                      <>
+                        <span className="ml-2 text-xs font-semibold text-amber-700">
+                          you
+                        </span>
+                        {myDelta !== null && <DeltaBadge delta={myDelta} />}
+                      </>
                     )}
                   </span>
                 </div>
@@ -191,6 +251,30 @@ function Section({
         </ol>
       )}
     </section>
+  );
+}
+
+function DeltaBadge({ delta }: { delta: number }) {
+  if (delta > 0) {
+    return (
+      <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-700 align-middle">
+        <ArrowUp size={12} strokeWidth={3} />
+        {delta}
+      </span>
+    );
+  }
+  if (delta < 0) {
+    return (
+      <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700 align-middle">
+        <ArrowDown size={12} strokeWidth={3} />
+        {Math.abs(delta)}
+      </span>
+    );
+  }
+  return (
+    <span className="ml-2 inline-flex items-center rounded-full bg-olive-100 px-1.5 py-0.5 text-xs font-bold text-olive-500 align-middle">
+      <Minus size={12} strokeWidth={3} />
+    </span>
   );
 }
 
