@@ -151,7 +151,7 @@ export default function LeaderboardPage() {
             accent="bg-olive-100 text-olive-700"
           />
           <Section
-            subtitle="Most likes received"
+            subtitle="Most-liked single photo"
             icon={<Heart size={20} />}
             rows={lens}
             valueKey="like_count"

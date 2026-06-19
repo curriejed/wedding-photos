@@ -60,17 +60,25 @@ group by pr.id, pr.name
 having count(ph.id) > 0
 order by photo_count desc, pr.name asc;
 
+-- Ranks photographers by the like count of their single most-liked photo,
+-- not the sum of likes across all their photos. Ties are broken by total
+-- likes across all of a photographer's photos, then alphabetically by name.
 create or replace view golden_lens_ranking as
 select
   pr.id,
   pr.name,
-  count(l.id)::int as like_count
+  max(coalesce(pl.like_count, 0))::int as like_count,
+  sum(coalesce(pl.like_count, 0))::int as total_likes
 from profiles pr
-left join photos ph on ph.user_id = pr.id
-left join likes  l  on l.photo_id  = ph.id
+join photos ph on ph.user_id = pr.id
+left join (
+  select photo_id, count(*)::int as like_count
+  from likes
+  group by photo_id
+) pl on pl.photo_id = ph.id
 group by pr.id, pr.name
-having count(l.id) > 0
-order by like_count desc, pr.name asc;
+having max(coalesce(pl.like_count, 0)) > 0
+order by like_count desc, total_likes desc, pr.name asc;
 
 -- ---------- Row level security ----------------------------
 -- App has no auth; we trust client identity (UUID in localStorage).
